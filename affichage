@@ -1,664 +1,183 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Excel & Data Viewer</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SheetJS Library -->
+  <title>Consommation STEG DenDen</title>
+  
+  <!-- SheetJS pour lire le fichier Excel -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
   <style>
-    /* Custom Scrollbars */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #f1f5f9;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
-    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f8fafc; color: #1e293b; padding: 20px; margin: 0; }
+    .container { max-width: 1200px; margin: 0 auto; background: #ffffff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    h1 { color: #0f172a; margin-top: 0; font-size: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
     
-    /* Table Header Fixed Positioning */
-    .table-container {
-      max-height: calc(100vh - 360px);
-      min-height: 350px;
-    }
+    /* Barre d'outils */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; flex-wrap: wrap; }
+    .search-box { padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; width: 250px; font-size: 14px; outline: none; }
+    .search-box:focus { border-color: #2563eb; ring: 2px #93c5fd; }
+    .sheet-tabs { display: flex; gap: 8px; margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; }
+    .tab-btn { padding: 8px 16px; border: none; background: #f1f5f9; cursor: pointer; border-radius: 6px 6px 0 0; font-weight: 600; color: #64748b; }
+    .tab-btn.active { background: #2563eb; color: #ffffff; }
 
-    /* Highlight matching search terms */
-    .highlight {
-      background-color: #fef08a;
-      font-weight: 600;
-    }
+    /* Conteneur de tableau */
+    .table-container { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    th { background-color: #f1f5f9; color: #334155; font-weight: 600; padding: 12px; border-bottom: 2px solid #e2e8f0; cursor: pointer; user-select: none; }
+    th:hover { background-color: #e2e8f0; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #475569; }
+    tr:hover { background-color: #f8fafc; }
+    tr:nth-child(even) { background-color: #fafafa; }
+
+    /* Status et messages */
+    .status-msg { padding: 15px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; }
+    .info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans">
+<body>
 
-  <!-- Header -->
-  <header class="bg-indigo-700 text-white shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-      <div class="flex items-center space-x-3">
-        <div class="p-2 bg-indigo-600 rounded-lg text-emerald-400">
-          <i class="fa-solid fa-file-excel text-2xl"></i>
-        </div>
-        <div>
-          <h1 class="text-xl font-bold tracking-wide">SheetView Pro</h1>
-          <p class="text-xs text-indigo-200">Interactive Web-Based Excel Viewer & Analyzer</p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <button id="btnGitHubGuide" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 shadow-sm">
-          <i class="fa-brands fa-github text-sm"></i> GitHub Pages Guide
-        </button>
-        <button id="btnSampleFile" class="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-xs font-medium text-white rounded-lg transition-colors flex items-center gap-2 shadow-sm">
-          <i class="fa-solid fa-flask text-sm"></i> Load Sample Data
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Container -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full flex flex-col gap-6">
-
-    <!-- File Upload / Dropzone Section -->
-    <div id="dropzone" class="border-2 border-dashed border-indigo-200 bg-white hover:border-indigo-400 hover:bg-indigo-50/30 transition-all rounded-xl p-6 text-center cursor-pointer shadow-sm relative group">
-      <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden">
-      <div class="flex flex-col items-center justify-center gap-2">
-        <div class="p-4 bg-indigo-50 rounded-full text-indigo-600 group-hover:scale-110 transition-transform">
-          <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
-        </div>
-        <div class="text-sm font-semibold text-slate-700">
-          Click to upload or drag & drop your Excel file here
-        </div>
-        <p class="text-xs text-slate-400">Supports .XLSX, .XLS, and .CSV formats</p>
-      </div>
-    </div>
-
-    <!-- KPI Summary Dashboard -->
-    <div id="kpiDashboard" class="grid grid-cols-2 md:grid-cols-4 gap-4 hidden">
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg">
-          <i class="fa-solid fa-table-cells text-lg"></i>
-        </div>
-        <div>
-          <p class="text-xs text-slate-500 font-medium">Active Sheet</p>
-          <p id="kpiActiveSheet" class="text-sm font-bold text-slate-800 truncate max-w-[130px]">-</p>
-        </div>
-      </div>
-
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
-          <i class="fa-solid fa-bars-staggered text-lg"></i>
-        </div>
-        <div>
-          <p class="text-xs text-slate-500 font-medium">Total Rows</p>
-          <p id="kpiTotalRows" class="text-base font-bold text-slate-800">0</p>
-        </div>
-      </div>
-
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-amber-50 text-amber-600 rounded-lg">
-          <i class="fa-solid fa-columns text-lg"></i>
-        </div>
-        <div>
-          <p class="text-xs text-slate-500 font-medium">Total Columns</p>
-          <p id="kpiTotalCols" class="text-base font-bold text-slate-800">0</p>
-        </div>
-      </div>
-
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div class="p-3 bg-purple-50 text-purple-600 rounded-lg">
-          <i class="fa-solid fa-filter text-lg"></i>
-        </div>
-        <div>
-          <p class="text-xs text-slate-500 font-medium">Filtered Rows</p>
-          <p id="kpiFilteredRows" class="text-base font-bold text-slate-800">0</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Content Panel -->
-    <div id="dataContainer" class="bg-white rounded-xl border border-slate-200 shadow-sm flex-1 flex flex-col hidden overflow-hidden">
-      
-      <!-- Sheet Navigation Tabs & Search Toolbar -->
-      <div class="border-b border-slate-200 bg-slate-50/50 p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
-        
-        <!-- Sheet Tabs -->
-        <div class="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none" id="sheetTabsContainer">
-          <!-- Dynamic Tabs inserted here -->
-        </div>
-
-        <!-- Controls: Search & Export -->
-        <div class="flex items-center gap-3 w-full md:w-auto justify-end">
-          <!-- Search input -->
-          <div class="relative w-full md:w-64">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-            <input type="text" id="searchInput" placeholder="Search table data..." class="w-full pl-9 pr-8 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500">
-            <button id="btnClearSearch" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs hidden">
-              <i class="fa-solid fa-xmark"></i>
-            </button>
-          </div>
-
-          <!-- Export Dropdown -->
-          <div class="relative inline-block text-left">
-            <button id="btnExport" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 border border-indigo-200">
-              <i class="fa-solid fa-download"></i> Export <i class="fa-solid fa-chevron-down text-[10px]"></i>
-            </button>
-            <div id="exportMenu" class="hidden absolute right-0 mt-2 w-40 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-20">
-              <a href="#" id="exportCSV" class="block px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                <i class="fa-solid fa-file-csv text-emerald-600"></i> Export to CSV
-              </a>
-              <a href="#" id="exportHTML" class="block px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                <i class="fa-solid fa-code text-blue-600"></i> Export to HTML
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Table Scrollable Area -->
-      <div class="table-container overflow-auto flex-1 relative bg-white">
-        <table id="excelTable" class="w-full text-left border-collapse text-xs">
-          <thead id="tableHead" class="sticky top-0 bg-slate-100 border-b border-slate-200 shadow-sm z-10">
-            <!-- Headers generated here -->
-          </thead>
-          <tbody id="tableBody" class="divide-y divide-slate-100">
-            <!-- Data rows generated here -->
-          </tbody>
-        </table>
-        
-        <!-- Empty / No Results State -->
-        <div id="noResultsState" class="hidden p-12 text-center text-slate-400">
-          <i class="fa-solid fa-magnifying-glass text-3xl mb-2"></i>
-          <p class="text-sm">No matching records found.</p>
-        </div>
-      </div>
-
-      <!-- Footer / Pagination Controls -->
-      <div class="border-t border-slate-200 bg-slate-50 p-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-        <div class="flex items-center gap-2">
-          <span>Rows per page:</span>
-          <select id="pageSizeSelect" class="bg-white border border-slate-300 rounded px-2 py-1 focus:outline-none">
-            <option value="25">25</option>
-            <option value="50" selected>50</option>
-            <option value="100">100</option>
-            <option value="250">250</option>
-          </select>
-          <span id="paginationInfo" class="ml-2 font-medium">Showing 0 - 0 of 0 entries</span>
-        </div>
-
-        <div class="flex items-center gap-1">
-          <button id="btnPrevPage" class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">
-            <i class="fa-solid fa-chevron-left"></i>
-          </button>
-          <span id="pageNumberDisplay" class="px-3 py-1 font-semibold">Page 1</span>
-          <button id="btnNextPage" class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">
-            <i class="fa-solid fa-chevron-right"></i>
-          </button>
-        </div>
-      </div>
-
-    </div>
-
-  </main>
-
-  <!-- GitHub Pages Integration Modal Guide -->
-  <div id="githubModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
-    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 relative max-h-[90vh] overflow-y-auto">
-      <button id="btnCloseModal" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1">
-        <i class="fa-solid fa-xmark text-lg"></i>
-      </button>
-
-      <div class="flex items-center gap-3 mb-4">
-        <div class="p-2.5 bg-slate-900 text-white rounded-lg">
-          <i class="fa-brands fa-github text-xl"></i>
-        </div>
-        <div>
-          <h2 class="text-base font-bold text-slate-800">Hosting on GitHub Pages to View Repo Files</h2>
-          <p class="text-xs text-slate-500">Automate rendering Excel files directly stored in your GitHub repository</p>
-        </div>
-      </div>
-
-      <div class="space-y-4 text-xs text-slate-600 leading-relaxed">
-        <p>You can host this single HTML page on <strong>GitHub Pages</strong> and configure it to automatically download and display any Excel file stored in your repository using JavaScript's <code class="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">fetch()</code> API.</p>
-
-        <div class="bg-slate-900 text-slate-200 p-4 rounded-lg font-mono text-[11px] overflow-x-auto relative group">
-          <pre><code>// Add this snippet to load an Excel file automatically on page load:
-window.addEventListener('DOMContentLoaded', () => {
-  const fileUrl = 'https://raw.githubusercontent.com/USERNAME/REPO/main/data.xlsx';
+<div class="container">
+  <h1>📊 Consommation STEG - DenDen</h1>
   
-  fetch(fileUrl)
-    .then(res => res.arrayBuffer())
-    .then(buffer => {
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      // Process workbook automatically
-      loadWorkbook(workbook);
-    });
-});</code></pre>
-        </div>
+  <div id="status" class="status-msg info">Chargement du fichier Excel en cours...</div>
+  
+  <div id="sheet-tabs" class="sheet-tabs"></div>
 
-        <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider pt-2">Quick Deployment Steps:</h3>
-        <ol class="list-decimal pl-5 space-y-1.5">
-          <li>Upload this <code class="bg-slate-100 px-1 border rounded">index.html</code> file to your GitHub repository root.</li>
-          <li>Place your <code class="bg-slate-100 px-1 border rounded">data.xlsx</code> file in the same repository.</li>
-          <li>Go to Repository <strong>Settings</strong> &gt; <strong>Pages</strong>.</li>
-          <li>Set Source Branch to <code class="bg-slate-100 px-1 border rounded">main</code> (or <code class="bg-slate-100 px-1 border rounded">master</code>) and click <strong>Save</strong>.</li>
-          <li>Access your interactive viewer online at <code class="text-indigo-600 font-medium">https://username.github.io/repository/</code>!</li>
-        </ol>
-      </div>
-
-      <div class="mt-6 flex justify-end">
-        <button id="btnCloseModalBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-colors">
-          Got it!
-        </button>
-      </div>
-    </div>
+  <div class="toolbar" id="toolbar" style="display: none;">
+    <input type="text" id="search-input" class="search-box" placeholder="Rechercher une valeur..." onkeyup="filterTable()">
+    <span id="row-count" style="font-size: 13px; color: #64748b;"></span>
   </div>
 
-  <script>
-    // App State Management
-    let currentWorkbook = null;
-    let activeSheetName = "";
-    let rawSheetData = []; // Full raw JSON array from sheet
-    let filteredData = []; // Filtered data matching search
-    let headers = [];
+  <div class="table-container">
+    <table id="excel-table">
+      <!-- Le contenu du tableau sera généré ici -->
+    </table>
+  </div>
+</div>
+
+<script>
+  // Nom exact de votre fichier Excel
+  const EXCEL_FILE = 'Consommation-STEG-DenDen.xlsx';
+  
+  let globalWorkbook = null;
+  let activeWorksheetData = [];
+
+  // Charger le fichier dès l'ouverture de la page
+  window.addEventListener('DOMContentLoaded', () => {
+    fetch(EXCEL_FILE)
+      .then(response => {
+        if (!response.ok) throw new Error("Fichier introuvable ou erreur réseau");
+        return response.arrayBuffer();
+      })
+      .then(buffer => {
+        globalWorkbook = XLSX.read(buffer, { type: 'array' });
+        document.getElementById('status').style.display = 'none';
+        document.getElementById('toolbar').style.display = 'flex';
+        renderSheetTabs();
+        loadSheet(globalWorkbook.SheetNames[0]);
+      })
+      .catch(err => {
+        const statusEl = document.getElementById('status');
+        statusEl.className = 'status-msg error';
+        statusEl.innerHTML = `<strong>Erreur :</strong> Impossible de charger le fichier <code>${EXCEL_FILE}</code>. Assurez-vous qu'il se trouve dans le même dossier que ce fichier HTML sur GitHub.`;
+      });
+  });
+
+  // Générer les onglets si le fichier contient plusieurs feuilles
+  function renderSheetTabs() {
+    const tabsContainer = document.getElementById('sheet-tabs');
+    tabsContainer.innerHTML = '';
     
-    // Table Config State
-    let sortColumn = null;
-    let sortAscending = true;
-    let currentPage = 1;
-    let pageSize = 50;
-
-    // DOM Elements
-    const dropzone = document.getElementById('dropzone');
-    const fileInput = document.getElementById('fileInput');
-    const kpiDashboard = document.getElementById('kpiDashboard');
-    const dataContainer = document.getElementById('dataContainer');
-    const sheetTabsContainer = document.getElementById('sheetTabsContainer');
-    const tableHead = document.getElementById('tableHead');
-    const tableBody = document.getElementById('tableBody');
-    const searchInput = document.getElementById('searchInput');
-    const btnClearSearch = document.getElementById('btnClearSearch');
-    const noResultsState = document.getElementById('noResultsState');
-
-    // KPI Elements
-    const kpiActiveSheet = document.getElementById('kpiActiveSheet');
-    const kpiTotalRows = document.getElementById('kpiTotalRows');
-    const kpiTotalCols = document.getElementById('kpiTotalCols');
-    const kpiFilteredRows = document.getElementById('kpiFilteredRows');
-
-    // Pagination Elements
-    const pageSizeSelect = document.getElementById('pageSizeSelect');
-    const paginationInfo = document.getElementById('paginationInfo');
-    const pageNumberDisplay = document.getElementById('pageNumberDisplay');
-    const btnPrevPage = document.getElementById('btnPrevPage');
-    const btnNextPage = document.getElementById('btnNextPage');
-
-    // Export & Modal Elements
-    const btnExport = document.getElementById('btnExport');
-    const exportMenu = document.getElementById('exportMenu');
-    const exportCSV = document.getElementById('exportCSV');
-    const exportHTML = document.getElementById('exportHTML');
-    const githubModal = document.getElementById('githubModal');
-    const btnGitHubGuide = document.getElementById('btnGitHubGuide');
-    const btnCloseModal = document.getElementById('btnCloseModal');
-    const btnCloseModalBtn = document.getElementById('btnCloseModalBtn');
-    const btnSampleFile = document.getElementById('btnSampleFile');
-
-    // --- File Input & Drag and Drop Handling ---
-    dropzone.addEventListener('click', () => fileInput.click());
-
-    dropzone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropzone.classList.add('border-indigo-500', 'bg-indigo-50/50');
-    });
-
-    dropzone.addEventListener('dragleave', () => {
-      dropzone.classList.remove('border-indigo-500', 'bg-indigo-50/50');
-    });
-
-    dropzone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropzone.classList.remove('border-indigo-500', 'bg-indigo-50/50');
-      if (e.dataTransfer.files.length > 0) {
-        handleFileSelect(e.dataTransfer.files[0]);
-      }
-    });
-
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files.length > 0) {
-        handleFileSelect(e.target.files[0]);
-      }
-    });
-
-    function handleFileSelect(file) {
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        processWorkbook(workbook);
+    globalWorkbook.SheetNames.forEach((sheetName, index) => {
+      const btn = document.createElement('button');
+      btn.className = `tab-btn ${index === 0 ? 'active' : ''}`;
+      btn.innerText = sheetName;
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadSheet(sheetName);
       };
-      reader.readAsArrayBuffer(file);
-    }
-
-    // --- Sample Data Loader ---
-    btnSampleFile.addEventListener('click', () => {
-      const sampleData = [
-        ["ID", "Employee Name", "Department", "Role", "Salary ($)", "Status"],
-        [101, "Jane Doe", "Engineering", "Senior Developer", 115000, "Active"],
-        [102, "John Smith", "Marketing", "SEO Specialist", 72000, "Active"],
-        [103, "Alice Johnson", "Sales", "Account Executive", 85000, "On Leave"],
-        [104, "Robert Lee", "Engineering", "DevOps Engineer", 108000, "Active"],
-        [105, "Emily Davis", "Design", "UI/UX Designer", 92000, "Active"],
-        [106, "Michael Brown", "Finance", "Financial Analyst", 78000, "Terminated"],
-        [107, "Sophia Wilson", "Engineering", "QA Engineer", 81000, "Active"]
-      ];
-
-      const ws = XLSX.utils.aoa_to_sheet(sampleData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Employees");
-
-      // Add a second sheet for demonstration
-      const salesData = [
-        ["Region", "Q1 Sales", "Q2 Sales", "Growth"],
-        ["North America", 45000, 52000, "15.5%"],
-        ["Europe", 32000, 31000, "-3.1%"],
-        ["Asia Pacific", 28000, 39000, "39.2%"]
-      ];
-      const ws2 = XLSX.utils.aoa_to_sheet(salesData);
-      XLSX.utils.book_append_sheet(wb, ws2, "Regional Sales");
-
-      processWorkbook(wb);
+      tabsContainer.appendChild(btn);
     });
+  }
 
-    // --- Core Data Processing ---
-    function processWorkbook(workbook) {
-      currentWorkbook = workbook;
-      renderSheetTabs(workbook.SheetNames);
-      switchSheet(workbook.SheetNames[0]);
+  // Convertir et afficher la feuille sélectionnée
+  function loadSheet(sheetName) {
+    const worksheet = globalWorkbook.Sheets[sheetName];
+    // Extraction des données brutes au format JSON
+    activeWorksheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    renderTable(activeWorksheetData);
+  }
 
-      // Show container elements
-      kpiDashboard.classList.remove('hidden');
-      dataContainer.classList.remove('hidden');
+  // Rendu HTML du tableau
+  function renderTable(data) {
+    const table = document.getElementById('excel-table');
+    table.innerHTML = '';
+
+    if (!data || data.length === 0) {
+      table.innerHTML = '<tr><td style="text-align:center; padding:20px;">La feuille est vide.</td></tr>';
+      return;
     }
 
-    function renderSheetTabs(sheetNames) {
-      sheetTabsContainer.innerHTML = '';
-      sheetNames.forEach((sheetName) => {
-        const btn = document.createElement('button');
-        btn.className = `px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all border ${
-          sheetName === activeSheetName
-            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-        }`;
-        btn.textContent = sheetName;
-        btn.onclick = () => switchSheet(sheetName);
-        sheetTabsContainer.appendChild(btn);
-      });
-    }
+    // Entêtes (Première ligne)
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const headers = data[0];
 
-    function switchSheet(sheetName) {
-      activeSheetName = sheetName;
-      renderSheetTabs(currentWorkbook.SheetNames);
+    headers.forEach((headerText) => {
+      const th = document.createElement('th');
+      th.innerText = headerText !== undefined ? headerText : '';
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
 
-      const worksheet = currentWorkbook.Sheets[sheetName];
-      // Convert sheet to 2D Array
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    // Lignes de données
+    const tbody = document.createElement('tbody');
+    let visibleRows = 0;
 
-      if (jsonData.length === 0) {
-        headers = [];
-        rawSheetData = [];
-      } else {
-        headers = jsonData[0] || [];
-        rawSheetData = jsonData.slice(1);
-      }
+    for (let i = 1; i < data.length; i++) {
+      const rowData = data[i];
+      if (rowData.length === 0) continue;
 
-      // Reset states
-      searchInput.value = '';
-      btnClearSearch.classList.add('hidden');
-      sortColumn = null;
-      sortAscending = true;
-      currentPage = 1;
-
-      applyFilterAndRender();
-    }
-
-    // --- Filtering, Sorting & Rendering ---
-    function applyFilterAndRender() {
-      const query = searchInput.value.toLowerCase().trim();
-
-      if (query === '') {
-        filteredData = [...rawSheetData];
-      } else {
-        filteredData = rawSheetData.filter(row => {
-          return row.some(cell => String(cell).toLowerCase().includes(query));
-        });
-      }
-
-      // Apply Sorting if configured
-      if (sortColumn !== null) {
-        filteredData.sort((a, b) => {
-          let valA = a[sortColumn] !== undefined ? a[sortColumn] : '';
-          let valB = b[sortColumn] !== undefined ? b[sortColumn] : '';
-
-          if (typeof valA === 'number' && typeof valB === 'number') {
-            return sortAscending ? valA - valB : valB - valA;
-          }
-          return sortAscending
-            ? String(valA).localeCompare(String(valB))
-            : String(valB).localeCompare(String(valA));
-        });
-      }
-
-      updateKPIs();
-      renderTableHeaders();
-      renderTableBody();
-      updatePaginationControls();
-    }
-
-    function renderTableHeaders() {
-      tableHead.innerHTML = '';
       const tr = document.createElement('tr');
-
-      // Row Index Header
-      const thIdx = document.createElement('th');
-      thIdx.className = 'px-4 py-3 text-slate-400 font-medium w-12 text-center border-r border-slate-200';
-      thIdx.textContent = '#';
-      tr.appendChild(thIdx);
-
-      headers.forEach((headerText, colIdx) => {
-        const th = document.createElement('th');
-        th.className = 'px-4 py-3 font-semibold text-slate-700 cursor-pointer hover:bg-slate-200/70 transition-colors border-r border-slate-200 select-none';
-        
-        const isSorted = sortColumn === colIdx;
-        const sortIcon = isSorted
-          ? sortAscending ? '<i class="fa-solid fa-arrow-up-wide-short text-indigo-600 ml-1"></i>' : '<i class="fa-solid fa-arrow-down-wide-short text-indigo-600 ml-1"></i>'
-          : '<i class="fa-solid fa-sort text-slate-300 ml-1 opacity-0 hover:opacity-100"></i>';
-
-        th.innerHTML = `<div class="flex items-center justify-between">
-          <span class="truncate">${headerText || `Column ${colIdx + 1}`}</span>
-          ${sortIcon}
-        </div>`;
-
-        th.onclick = () => {
-          if (sortColumn === colIdx) {
-            sortAscending = !sortAscending;
-          } else {
-            sortColumn = colIdx;
-            sortAscending = true;
-          }
-          applyFilterAndRender();
-        };
-
-        tr.appendChild(th);
+      headers.forEach((_, colIndex) => {
+        const td = document.createElement('td');
+        const cellValue = rowData[colIndex];
+        td.innerText = cellValue !== undefined ? cellValue : '';
+        tr.appendChild(td);
       });
-
-      tableHead.appendChild(tr);
+      tbody.appendChild(tr);
+      visibleRows++;
     }
 
-    function renderTableBody() {
-      tableBody.innerHTML = '';
+    table.appendChild(tbody);
+    document.getElementById('row-count').innerText = `${visibleRows} lignes affichées`;
+  }
 
-      if (filteredData.length === 0) {
-        noResultsState.classList.remove('hidden');
-        return;
-      }
-      noResultsState.classList.add('hidden');
+  // Filtre de recherche dynamique
+  function filterTable() {
+    const query = document.getElementById('search-input').value.toLowerCase();
+    const rows = document.querySelectorAll('#excel-table tbody tr');
+    let count = 0;
 
-      const startIdx = (currentPage - 1) * pageSize;
-      const endIdx = Math.min(startIdx + pageSize, filteredData.length);
-      const pageData = filteredData.slice(startIdx, endIdx);
-      const query = searchInput.value.trim().toLowerCase();
-
-      pageData.forEach((row, rowOffset) => {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-indigo-50/30 transition-colors';
-
-        // Row Index Cell
-        const tdIdx = document.createElement('td');
-        tdIdx.className = 'px-4 py-2.5 text-center text-slate-400 font-mono text-[11px] border-r border-slate-100';
-        tdIdx.textContent = startIdx + rowOffset + 1;
-        tr.appendChild(tdIdx);
-
-        // Render cell contents matching header length
-        headers.forEach((_, colIdx) => {
-          const td = document.createElement('td');
-          td.className = 'px-4 py-2.5 text-slate-600 border-r border-slate-100 truncate max-w-xs';
-          const cellValue = row[colIdx] !== undefined ? String(row[colIdx]) : '';
-
-          // Highlight search query match
-          if (query && cellValue.toLowerCase().includes(query)) {
-            const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
-            td.innerHTML = cellValue.replace(regex, '<mark class="highlight">$1</mark>');
-          } else {
-            td.textContent = cellValue;
-          }
-
-          tr.appendChild(td);
-        });
-
-        tableBody.appendChild(tr);
-      });
-    }
-
-    function escapeRegExp(string) {
-      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    // --- KPI & Pagination Updates ---
-    function updateKPIs() {
-      kpiActiveSheet.textContent = activeSheetName;
-      kpiTotalRows.textContent = rawSheetData.length.toLocaleString();
-      kpiTotalCols.textContent = headers.length.toLocaleString();
-      kpiFilteredRows.textContent = filteredData.length.toLocaleString();
-    }
-
-    function updatePaginationControls() {
-      const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
-      const startRecord = filteredData.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-      const endRecord = Math.min(currentPage * pageSize, filteredData.length);
-
-      paginationInfo.textContent = `Showing ${startRecord} - ${endRecord} of ${filteredData.length} entries`;
-      pageNumberDisplay.textContent = `Page ${currentPage} of ${totalPages}`;
-
-      btnPrevPage.disabled = currentPage === 1;
-      btnNextPage.disabled = currentPage >= totalPages;
-    }
-
-    // --- Event Listeners: Search & Pagination ---
-    searchInput.addEventListener('input', () => {
-      if (searchInput.value.length > 0) {
-        btnClearSearch.classList.remove('hidden');
+    rows.forEach(row => {
+      const text = row.innerText.toLowerCase();
+      if (text.includes(query)) {
+        row.style.display = '';
+        count++;
       } else {
-        btnClearSearch.classList.add('hidden');
-      }
-      currentPage = 1;
-      applyFilterAndRender();
-    });
-
-    btnClearSearch.addEventListener('click', () => {
-      searchInput.value = '';
-      btnClearSearch.classList.add('hidden');
-      currentPage = 1;
-      applyFilterAndRender();
-    });
-
-    pageSizeSelect.addEventListener('change', (e) => {
-      pageSize = parseInt(e.target.value);
-      currentPage = 1;
-      applyFilterAndRender();
-    });
-
-    btnPrevPage.addEventListener('click', () => {
-      if (currentPage > 1) {
-        currentPage--;
-        applyFilterAndRender();
+        row.style.display = 'none';
       }
     });
 
-    btnNextPage.addEventListener('click', () => {
-      const totalPages = Math.ceil(filteredData.length / pageSize);
-      if (currentPage < totalPages) {
-        currentPage++;
-        applyFilterAndRender();
-      }
-    });
+    document.getElementById('row-count').innerText = `${count} lignes trouvées`;
+  }
+</script>
 
-    // --- Export Functionalities ---
-    btnExport.addEventListener('click', () => {
-      exportMenu.classList.toggle('hidden');
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!btnExport.contains(e.target) && !exportMenu.contains(e.target)) {
-        exportMenu.classList.add('hidden');
-      }
-    });
-
-    exportCSV.addEventListener('click', (e) => {
-      e.preventDefault();
-      exportMenu.classList.add('hidden');
-      if (!filteredData.length) return;
-
-      const exportSheet = XLSX.utils.json_to_sheet(filteredData, { header: headers });
-      const csvOutput = XLSX.utils.sheet_to_csv(exportSheet);
-      
-      downloadFile(csvOutput, `${activeSheetName}_export.csv`, 'text/csv;charset=utf-8;');
-    });
-
-    exportHTML.addEventListener('click', (e) => {
-      e.preventDefault();
-      exportMenu.classList.add('hidden');
-      if (!filteredData.length) return;
-
-      const exportSheet = XLSX.utils.json_to_sheet(filteredData, { header: headers });
-      const htmlOutput = XLSX.utils.sheet_to_html(exportSheet);
-
-      downloadFile(htmlOutput, `${activeSheetName}_export.html`, 'text/html;charset=utf-8;');
-    });
-
-    function downloadFile(content, fileName, mimeType) {
-      const blob = new Blob([content], { type: mimeType });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = fileName;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    }
-
-    // --- Modal Controls ---
-    btnGitHubGuide.addEventListener('click', () => githubModal.classList.remove('hidden'));
-    btnCloseModal.addEventListener('click', () => githubModal.classList.add('hidden'));
-    btnCloseModalBtn.addEventListener('click', () => githubModal.classList.add('hidden'));
-  </script>
 </body>
 </html>
