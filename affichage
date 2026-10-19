@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Affichage Fichier Excel</title>
+  <!-- Chargement de la bibliothèque SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f4f4f4; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+  </style>
+</head>
+<body>
+
+  <h2>Données de la feuille Excel</h2>
+  <div id="excel-table">Chargement des données...</div>
+
+  <script>
+    // Remplacez 'votre_fichier.xlsx' par le nom ou le chemin de votre fichier Excel sur GitHub
+    const url = 'votre_fichier.xlsx';
+
+    fetch(url)
+      .then(response => response.arrayBuffer())
+      .then(data => {
+        const workbook = XLSX.read(data, { type: 'array' });
+        // Récupérer le nom de la première feuille
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convertir la feuille en code HTML
+        const htmlTable = XLSX.utils.sheet_to_html(worksheet);
+        
+        // Afficher dans la page
+        document.getElementById('excel-table').innerHTML = htmlTable;
+      })
+      .catch(error => {
+        console.error('Erreur lors du chargement :', error);
+        document.getElementById('excel-table').innerText = 'Impossible de charger le fichier Excel.';
+      });
+  </script>
+
+</body>
+</html>
