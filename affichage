@@ -20,7 +20,7 @@
 
   <script>
     // Remplacez 'votre_fichier.xlsx' par le nom ou le chemin de votre fichier Excel sur GitHub
-    const url = 'votre_fichier.xlsx';
+    const url = 'Consommation-STEG-DenDen.xlsx';
 
     fetch(url)
       .then(response => response.arrayBuffer())
